@@ -196,6 +196,12 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------------
 -- 8. Atualizações Incrementais Seguras (Upgrades para bancos já existentes)
 -- ---------------------------------------------------------------------------
+alter table app_settings add column if not exists stock_provider text default 'any';
+alter table app_settings add column if not exists pexels_api_key text;
+alter table app_settings add column if not exists pixabay_api_key text;
+alter table app_settings add column if not exists cloudflare_account_id text;
+alter table app_settings add column if not exists cloudflare_api_token text;
+alter table app_settings add column if not exists pollinations_api_key text;
 alter table app_settings add column if not exists default_target_type text default 'group';
 alter table app_settings add column if not exists default_group_id text;
 alter table app_settings add column if not exists default_group_name text;
