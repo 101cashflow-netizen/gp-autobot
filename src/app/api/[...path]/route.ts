@@ -347,13 +347,16 @@ const DefaultGroupBody = z.object({
 const AddGroupBody = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1),
-  description: z.string().optional(),
-  privacy: z.string().optional(),
+  description: z.string().optional().nullable(),
+  privacy: z.string().optional().nullable(),
   status: z.enum(["MEMBER", "ADMIN", "PENDING", "DISCOVERED", "BLACKLISTED"]).default("MEMBER"),
-  category: z.string().optional(),
-  groupUrl: z.string().optional(),
-  canPost: z.boolean().default(true),
-  notes: z.string().optional(),
+  category: z.string().optional().nullable(),
+  group_url: z.string().optional().nullable(),
+  groupUrl: z.string().optional().nullable(),
+  can_post: z.boolean().optional(),
+  canPost: z.boolean().optional(),
+  is_secret: z.boolean().optional(),
+  notes: z.string().optional().nullable(),
 });
 
 const BulkAddGroupsBody = z.object({
@@ -490,12 +493,35 @@ export async function POST(req: Request, ctx: Ctx) {
       if (body?.groups && Array.isArray(body.groups)) {
         const parsed = BulkAddGroupsBody.safeParse(body);
         if (!parsed.success) return json({ error: "Formato de grupos inválido." }, 400);
-        const count = await bulkUpsertGroups(parsed.data.groups);
+        const mapped = parsed.data.groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          description: g.description ?? null,
+          privacy: g.privacy ?? "PUBLIC",
+          status: g.status,
+          category: g.category ?? null,
+          group_url: g.group_url ?? g.groupUrl ?? `https://www.facebook.com/groups/${g.id}`,
+          can_post: g.can_post ?? g.canPost ?? true,
+          is_secret: g.is_secret ?? (g.privacy === "SECRET"),
+          notes: g.notes ?? null,
+        }));
+        const count = await bulkUpsertGroups(mapped);
         return json({ ok: true, count });
       }
       const parsed = AddGroupBody.safeParse(body);
       if (!parsed.success) return json({ error: "Dados do grupo inválidos." }, 400);
-      const group = await upsertGroup(parsed.data);
+      const group = await upsertGroup({
+        id: parsed.data.id,
+        name: parsed.data.name,
+        description: parsed.data.description ?? null,
+        privacy: parsed.data.privacy ?? "PUBLIC",
+        status: parsed.data.status,
+        category: parsed.data.category ?? null,
+        group_url: parsed.data.group_url ?? parsed.data.groupUrl ?? `https://www.facebook.com/groups/${parsed.data.id}`,
+        can_post: parsed.data.can_post ?? parsed.data.canPost ?? true,
+        is_secret: parsed.data.is_secret ?? (parsed.data.privacy === "SECRET"),
+        notes: parsed.data.notes ?? null,
+      });
       return json({ ok: true, group });
     }
 

@@ -182,11 +182,11 @@ export default function GroupsPage() {
           category: manualInput.category.trim() || undefined,
           privacy: manualInput.privacy,
           status: manualInput.status,
-          groupUrl: manualInput.urlOrId.startsWith("http")
+          group_url: manualInput.urlOrId.startsWith("http")
             ? manualInput.urlOrId
             : `https://www.facebook.com/groups/${id}`,
           notes: manualInput.notes.trim() || undefined,
-          canPost: true,
+          can_post: true,
         }),
       });
 
@@ -235,8 +235,8 @@ export default function GroupsPage() {
         category: bulkCategory.trim() || undefined,
         status: "MEMBER" as const,
         privacy: "PUBLIC",
-        groupUrl: line.startsWith("http") ? line : `https://www.facebook.com/groups/${id}`,
-        canPost: true,
+        group_url: line.startsWith("http") ? line : `https://www.facebook.com/groups/${id}`,
+        can_post: true,
       };
     });
 
