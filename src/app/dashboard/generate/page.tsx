@@ -15,6 +15,8 @@ import {
   ArrowSquareOut,
   VideoCamera,
   Article,
+  Copy,
+  Check,
 } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +80,7 @@ export default function GeneratePage() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [saving, setSaving] = useState<"draft" | "schedule" | "post_now" | null>(null);
+  const [copiedText, setCopiedText] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
 
@@ -980,21 +983,56 @@ export default function GeneratePage() {
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={async () => {
+                    if (!content) return;
+                    const parts: string[] = [];
+                    if (content.title) parts.push(content.title);
+                    if (content.description) parts.push(content.description);
+                    if (content.hashtags?.length) {
+                      parts.push(content.hashtags.map((h) => `#${h}`).join(" "));
+                    }
+                    if (linkUrl) parts.push(linkUrl);
+                    await navigator.clipboard.writeText(parts.join("\n\n"));
+                    setCopiedText(true);
+                    setTimeout(() => setCopiedText(false), 2500);
+                  }}
+                  className={copiedText ? "bg-success/20 text-success border-success/40" : ""}
+                  title="Copiar texto completo (Título, Descrição, Hashtags e Link)"
+                >
+                  {copiedText ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+                  {copiedText ? "Texto Copiado!" : "Copiar Texto"}
+                </Button>
+
+                {targetType === "group" && groupId && (
+                  <a
+                    href={`https://facebook.com/groups/${groupId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3.5 py-2 text-sm font-semibold text-foreground hover:bg-surface-3 transition"
+                    title="Abrir página do grupo no Facebook"
+                  >
+                    <ArrowSquareOut size={16} /> Abrir Grupo no Facebook
+                  </a>
+                )}
+
                 <Button variant="secondary" onClick={() => save("draft")} disabled={saving !== null}>
-                  <FloppyDisk size={16} /> Save draft
+                  <FloppyDisk size={16} /> Salvar Rascunho
                 </Button>
                 {scheduleOpen ? (
                   <Button variant="secondary" onClick={() => save("schedule")} disabled={saving !== null}>
-                    <CalendarPlus size={16} /> {saving === "schedule" ? "Scheduling…" : "Confirm schedule"}
+                    <CalendarPlus size={16} /> {saving === "schedule" ? "Agendando…" : "Confirmar Agendamento"}
                   </Button>
                 ) : (
                   <Button variant="secondary" onClick={() => setScheduleOpen(true)} disabled={saving !== null}>
-                    <CalendarPlus size={16} /> Schedule
+                    <CalendarPlus size={16} /> Agendar
                   </Button>
                 )}
                 <Button onClick={() => save("post_now")} disabled={saving !== null}>
-                  <Rocket size={16} weight="fill" /> {saving === "post_now" ? "Publishing…" : "Publish now"}
+                  <Rocket size={16} weight="fill" /> {saving === "post_now" ? "Publicando…" : "Publicar agora via API"}
                 </Button>
               </div>
             </div>

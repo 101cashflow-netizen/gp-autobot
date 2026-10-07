@@ -12,11 +12,12 @@ import {
   ArrowsClockwise,
   ArrowSquareOut,
   Info,
+  Copy,
 } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
-import { facebookPostUrl } from "@/lib/types";
+import { composeMessage, facebookPostUrl } from "@/lib/types";
 import type { Post } from "@/lib/types";
 
 function toLocalInputValue(iso: string | null) {
@@ -30,6 +31,7 @@ export default function QueuePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTime, setDraftTime] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -320,7 +322,42 @@ export default function QueuePage() {
                       )}
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
+                          const text = composeMessage(post);
+                          await navigator.clipboard.writeText(text);
+                          setCopiedId(post.id);
+                          setTimeout(() => setCopiedId(null), 2500);
+                        }}
+                        title="Copiar texto completo (Título, Legenda, Hashtags e Link)"
+                        className={copiedId === post.id ? "bg-success/20 text-success border-success/40" : ""}
+                      >
+                        {copiedId === post.id ? (
+                          <>
+                            <Check size={14} className="text-success" /> Copiado!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Copiar Texto
+                          </>
+                        )}
+                      </Button>
+
+                      {(post.group_id || post.target_type === "group") && (
+                        <a
+                          href={post.group_id ? `https://facebook.com/groups/${post.group_id}` : "https://www.facebook.com/groups/feed/"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition"
+                          title="Abrir página do grupo no Facebook"
+                        >
+                          <ArrowSquareOut size={14} /> Abrir Grupo
+                        </a>
+                      )}
+
                       <Button
                         size="sm"
                         variant="secondary"

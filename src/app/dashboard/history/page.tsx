@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowSquareOut, Article } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, Article, Copy, Check } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { facebookPostUrl } from "@/lib/types";
+import { composeMessage, facebookPostUrl } from "@/lib/types";
 import type { Post, PostStatus } from "@/lib/types";
 
 const FILTERS: { label: string; value: PostStatus | "all" }[] = [
@@ -18,6 +19,7 @@ export default function HistoryPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<PostStatus | "all">("all");
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,10 +72,10 @@ export default function HistoryPage() {
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
                     <th className="pb-2 font-medium">Post</th>
-                    <th className="hidden pb-2 font-medium sm:table-cell">Página</th>
+                    <th className="hidden pb-2 font-medium sm:table-cell">Destino</th>
                     <th className="pb-2 font-medium">Status</th>
                     <th className="pb-2 font-medium">Data</th>
-                    <th className="pb-2 font-medium text-right">Facebook</th>
+                    <th className="pb-2 font-medium text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,16 +126,47 @@ export default function HistoryPage() {
                         })}
                       </td>
                       <td className="py-3 text-right">
-                        {post.facebook_post_id && (
-                          <a
-                            href={facebookPostUrl(post.facebook_post_id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className={cn("h-7 px-2 text-xs", copiedId === post.id && "bg-success/20 text-success")}
+                            onClick={async () => {
+                              const text = composeMessage(post);
+                              await navigator.clipboard.writeText(text);
+                              setCopiedId(post.id);
+                              setTimeout(() => setCopiedId(null), 2500);
+                            }}
+                            title="Copiar texto formatado do post"
                           >
-                            Ver post <ArrowSquareOut size={12} />
-                          </a>
-                        )}
+                            {copiedId === post.id ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                            <span className="hidden md:inline">{copiedId === post.id ? "Copiado!" : "Copiar"}</span>
+                          </Button>
+
+                          {(post.group_id || post.target_type === "group") && (
+                            <a
+                              href={post.group_id ? `https://facebook.com/groups/${post.group_id}` : "https://www.facebook.com/groups/feed/"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground hover:bg-surface-3 transition"
+                              title="Abrir página do grupo no Facebook"
+                            >
+                              <ArrowSquareOut size={13} />
+                              <span className="hidden md:inline">Grupo</span>
+                            </a>
+                          )}
+
+                          {post.facebook_post_id && (
+                            <a
+                              href={facebookPostUrl(post.facebook_post_id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-7 items-center gap-1 rounded-lg bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition"
+                            >
+                              Ver post <ArrowSquareOut size={12} />
+                            </a>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
