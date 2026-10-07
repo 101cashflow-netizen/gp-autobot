@@ -244,7 +244,7 @@ export default function QueuePage() {
                     {post.media_type === "video" ? (
                       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-black">
                         <video
-                          src={post.media_url || post.image_url}
+                          src={post.media_url || post.image_url || undefined}
                           className="h-full w-full object-cover"
                           muted
                           playsInline
@@ -260,7 +260,7 @@ export default function QueuePage() {
                       </div>
                     ) : (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={post.image_url} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                      <img src={post.image_url || undefined} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
                     )}
 
                     <div className="min-w-0 flex-1">

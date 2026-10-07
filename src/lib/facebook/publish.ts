@@ -72,7 +72,7 @@ export async function publishPostNow(postId: string): Promise<Post> {
         pageId,
         pageToken,
         description: composeMessage(post, settings.utm_suffix),
-        videoUrl: post.media_url || post.image_url,
+        videoUrl: post.media_url || post.image_url || "",
         title: post.title,
       });
     } else if (isText) {

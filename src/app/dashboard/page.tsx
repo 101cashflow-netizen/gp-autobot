@@ -216,7 +216,7 @@ export default async function DashboardOverviewPage() {
                       {post.media_type === "video" ? (
                         <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black">
                           <video
-                            src={post.media_url || post.image_url}
+                            src={post.media_url || post.image_url || undefined}
                             className="h-full w-full object-cover"
                             muted
                             playsInline
@@ -228,7 +228,7 @@ export default async function DashboardOverviewPage() {
                         </div>
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={post.image_url} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                        <img src={post.image_url || undefined} alt="" className="h-10 w-10 rounded-lg object-cover" />
                       )}
                     </td>
                     <td className="max-w-[220px] truncate py-2.5 pr-3 font-medium text-foreground">

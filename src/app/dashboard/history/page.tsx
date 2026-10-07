@@ -84,7 +84,7 @@ export default function HistoryPage() {
                           {post.media_type === "video" ? (
                             <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black">
                               <video
-                                src={post.media_url || post.image_url}
+                                src={post.media_url || post.image_url || undefined}
                                 className="h-full w-full object-cover"
                                 muted
                                 playsInline
@@ -96,7 +96,7 @@ export default function HistoryPage() {
                             </div>
                           ) : (
                             /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={post.image_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                            <img src={post.image_url || undefined} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                           )}
                           <div className="min-w-0">
                             <p className="truncate font-medium text-foreground">{post.title}</p>
