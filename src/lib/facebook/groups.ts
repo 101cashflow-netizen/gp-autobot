@@ -34,50 +34,72 @@ async function graph(path: string, params: Record<string, string>, init?: Reques
  * Fetches all groups where the connected account is a member or admin (/me/groups).
  * This includes secret/private hidden groups that the user is already part of.
  */
-export async function syncUserGroups(): Promise<{ total: number; groups: FacebookGroup[] }> {
+export async function syncUserGroups(): Promise<{ total: number; groups: FacebookGroup[]; message?: string }> {
   const settings = await loadSettings();
   if (!settings.facebook_user_token) {
     throw new Error("Facebook não está conectado. Conecte sua conta nas Configurações primeiro.");
   }
 
+  const token = settings.facebook_user_token;
   const foundGroups: Array<Partial<FacebookGroup> & { id: string; name: string }> = [];
   let after: string | undefined;
 
-  do {
-    const params: Record<string, string> = {
-      access_token: settings.facebook_user_token,
-      fields: "id,name,description,privacy,administrator,member_count,icon,cover",
-      limit: "100",
-    };
-    if (after) params.after = after;
+  try {
+    do {
+      const params: Record<string, string> = {
+        access_token: token,
+        fields: "id,name,description,privacy,administrator,icon",
+        limit: "100",
+      };
+      if (after) params.after = after;
 
-    const data = await graph("/me/groups", params);
-    for (const g of data.data ?? []) {
-      const isSecret = g.privacy === "SECRET" || g.privacy === "CLOSED_SECRET";
-      foundGroups.push({
-        id: g.id,
-        name: g.name,
-        description: g.description ?? null,
-        privacy: g.privacy ?? "UNKNOWN",
-        status: g.administrator ? "ADMIN" : "MEMBER",
-        member_count: g.member_count ?? 0,
-        group_url: `https://www.facebook.com/groups/${g.id}`,
-        icon_url: g.icon ?? g.cover?.source ?? null,
-        can_post: true,
-        is_secret: isSecret,
-      });
-    }
+      let data: any;
+      try {
+        data = await graph("/me/groups", params);
+      } catch {
+        data = await graph("/me/groups", {
+          access_token: token,
+          fields: "id,name,privacy,administrator",
+          limit: "100",
+        });
+      }
 
-    after = data.paging?.cursors?.after && data.paging?.next ? data.paging.cursors.after : undefined;
-  } while (after);
+      for (const g of data.data ?? []) {
+        const isSecret = g.privacy === "SECRET" || g.privacy === "CLOSED_SECRET";
+        foundGroups.push({
+          id: g.id,
+          name: g.name,
+          description: g.description ?? null,
+          privacy: g.privacy ?? "UNKNOWN",
+          status: g.administrator ? "ADMIN" : "MEMBER",
+          member_count: g.member_count ?? 0,
+          group_url: `https://www.facebook.com/groups/${g.id}`,
+          icon_url: g.icon ?? null,
+          can_post: true,
+          is_secret: isSecret,
+        });
+      }
+
+      after = data.paging?.cursors?.after && data.paging?.next ? data.paging.cursors.after : undefined;
+    } while (after);
+  } catch (err) {
+    console.error("Erro ao buscar /me/groups:", err);
+  }
 
   if (foundGroups.length > 0) {
     await bulkUpsertGroups(foundGroups);
   }
 
+  let message: string | undefined;
+  if (foundGroups.length === 0) {
+    message =
+      "A API do Facebook não retornou grupos automáticos para este token (normal se o Meta App estiver sem o caso de uso de Grupos ou em modo dev). Você pode cadastrar seus grupos imediatamente colando os links em '+ Adicionar Grupo' ou 'Importar em Lote'.";
+  }
+
   return {
     total: foundGroups.length,
     groups: foundGroups as FacebookGroup[],
+    message,
   };
 }
 

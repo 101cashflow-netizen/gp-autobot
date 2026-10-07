@@ -15,6 +15,8 @@ export const FACEBOOK_SCOPES = [
   "pages_show_list",
   "pages_manage_posts",
   "pages_read_engagement",
+  "groups_access_member_info",
+  "publish_to_groups",
 ];
 
 /**
