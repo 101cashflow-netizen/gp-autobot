@@ -30,17 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+*.env
+*.env.txt
+*env*.txt
+fbauto.env
 
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-.vercel
-.env*
+# cloudflare / wrangler
 .wrangler
 .cloudflare
+.next
+*.tsbuildinfo
+next-env.d.ts

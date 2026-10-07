@@ -25,16 +25,17 @@ import { cn } from "@/lib/cn";
 import type { CopyLanguage, CopyLength, CopyTone, ImageSourcePref, TextAiProviderPref } from "@/lib/types";
 
 const TIMEZONES = [
-  "Asia/Karachi",
-  "Asia/Kolkata",
-  "Asia/Dubai",
-  "Asia/Dhaka",
-  "Europe/London",
-  "Europe/Berlin",
+  "America/Sao_Paulo",
+  "America/Manaus",
+  "America/Fortaleza",
+  "America/Belem",
+  "America/Cuiaba",
   "America/New_York",
   "America/Chicago",
   "America/Los_Angeles",
-  "Australia/Sydney",
+  "Europe/London",
+  "Europe/Lisbon",
+  "Europe/Berlin",
   "UTC",
 ];
 

@@ -273,9 +273,8 @@ export default function QueuePage() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 truncate text-sm text-muted-foreground">{post.description}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Página: <strong>{post.page_name ?? "Padrão"}</strong>
+                        Destino: <strong>{post.target_type === "group" || post.group_name ? `👥 ${post.group_name ?? "Grupo Padrão"}` : `🚩 ${post.page_name ?? "Página Padrão"}`}</strong>
                         {post.scheduled_at && (
                           <>
                             {" · "}

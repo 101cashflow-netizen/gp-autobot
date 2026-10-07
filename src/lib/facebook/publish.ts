@@ -1,22 +1,56 @@
 import { publishPhoto, publishVideo, publishText, NoPageSelectedError } from "@/lib/facebook/client";
+import { publishToGroup } from "@/lib/facebook/groups";
 import { getPost, updatePostRecord } from "@/lib/db/posts";
 import { getSettings } from "@/lib/db/settings";
+import { recordGroupPostSuccess } from "@/lib/db/groups";
 import { composeMessage } from "@/lib/types";
 import type { Post } from "@/lib/types";
 
 /**
- * Publishes one queued post to its Facebook Page and records the outcome.
- * Shared by the "post now" route and the scheduled-queue cron worker so there
- * is exactly one place that talks to the Graph publish endpoint.
+ * Publishes one queued post to its designated Facebook Group or Page.
  */
 export async function publishPostNow(postId: string): Promise<Post> {
   const post = await getPost(postId);
   if (!post) throw new Error("Post not found.");
 
   const settings = await getSettings();
+  const isGroupPost = post.target_type === "group" || (!post.page_id && (post.group_id || settings.default_group_id));
 
-  // A post carries the Page it was written for, but the token lives in
-  // settings, so a Page that is no longer the selected one cannot be posted to.
+  if (isGroupPost) {
+    const groupId = post.group_id ?? settings.default_group_id;
+    if (!groupId) {
+      return updatePostRecord(postId, {
+        status: "failed",
+        error_message: "Nenhum Grupo selecionado para publicação.",
+      });
+    }
+
+    try {
+      const message = composeMessage(post, settings.utm_suffix);
+      const isVideo = post.media_type === "video";
+      const result = await publishToGroup({
+        groupId,
+        message,
+        imageUrl: !isVideo ? post.image_url : null,
+        videoUrl: isVideo ? (post.media_url || post.image_url) : null,
+        linkUrl: post.link_url,
+      });
+
+      await recordGroupPostSuccess(groupId).catch(() => {});
+
+      return await updatePostRecord(postId, {
+        status: "posted",
+        facebook_post_id: result.id,
+        posted_at: new Date().toISOString(),
+        error_message: null,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido ao publicar no grupo.";
+      return await updatePostRecord(postId, { status: "failed", error_message: message });
+    }
+  }
+
+  // Post para Facebook Page
   const pageId = post.page_id ?? settings.default_page_id;
   const pageToken =
     post.page_id && post.page_id !== settings.default_page_id ? null : settings.default_page_token;
@@ -53,7 +87,7 @@ export async function publishPostNow(postId: string): Promise<Post> {
         pageId,
         pageToken,
         message: composeMessage(post, settings.utm_suffix),
-        imageUrl: post.image_url,
+        imageUrl: post.image_url ?? "",
       });
     }
 
@@ -66,8 +100,6 @@ export async function publishPostNow(postId: string): Promise<Post> {
   } catch (err) {
     let message = err instanceof Error ? err.message : "Unknown error while posting.";
 
-    // Facebook reports a token that lacks pages_manage_posts as a bare
-    // "(#200) Permissions error", which says nothing about what to fix.
     if (/\(#200\)|permissions? error/i.test(message)) {
       message =
         "Facebook rejected this for missing permissions. The connected token needs " +

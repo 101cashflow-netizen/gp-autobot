@@ -38,6 +38,15 @@ import {
   missingPermissions,
   FacebookNotConnectedError,
 } from "@/lib/facebook/client";
+import { syncUserGroups } from "@/lib/facebook/groups";
+import {
+  listGroups,
+  getGroup,
+  upsertGroup,
+  bulkUpsertGroups,
+  deleteGroup,
+  updateGroupStatus,
+} from "@/lib/db/groups";
 import {
   buildAuthorizeUrl,
   exchangeCodeForToken,
@@ -48,7 +57,7 @@ import { OAUTH_STATE_COOKIE } from "@/lib/facebook/oauth-state";
 import { publishPostNow } from "@/lib/facebook/publish";
 import { maybeRunAutopilot } from "@/lib/autopilot";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import type { PostStatus } from "@/lib/types";
+import type { PostStatus, TargetType } from "@/lib/types";
 
 /**
  * Every API endpoint lives in this one catch-all handler on purpose.
@@ -223,6 +232,16 @@ export async function GET(req: Request, ctx: Ctx) {
       return getPages(url.searchParams.get("refresh") === "1");
     }
 
+    if (route === "facebook/groups") {
+      const [groups, settings] = await Promise.all([listGroups(), getSettings()]);
+      return json({
+        groups,
+        defaultGroupId: settings.default_group_id,
+        defaultGroupName: settings.default_group_name,
+        defaultTargetType: settings.default_target_type || "group",
+      });
+    }
+
     if (route === "topics") {
       const settings = await getSettings();
       const source = settings.topic_source ?? "mine";
@@ -308,13 +327,37 @@ const CreatePostBody = z.object({
   mediaType: z.enum(["image", "video", "text"]).default("image"),
   mediaUrl: z.string().url().optional().or(z.literal("")),
   linkUrl: z.string().url().optional().or(z.literal("")),
-  pageId: z.string().min(1),
-  pageName: z.string().min(1),
+  targetType: z.enum(["group", "page", "multiple_groups"]).default("group"),
+  groupId: z.string().optional(),
+  groupName: z.string().optional(),
+  targetGroupIds: z.array(z.string()).optional(),
+  pageId: z.string().optional(),
+  pageName: z.string().optional(),
   action: z.enum(["draft", "schedule", "post_now"]),
   scheduledAt: z.string().datetime().optional(),
 });
 
 const DefaultPageBody = z.object({ pageId: z.string().min(1) });
+const DefaultGroupBody = z.object({
+  groupId: z.string().min(1),
+  groupName: z.string().min(1),
+});
+
+const AddGroupBody = z.object({
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  description: z.string().optional(),
+  privacy: z.string().optional(),
+  status: z.enum(["MEMBER", "ADMIN", "PENDING", "DISCOVERED", "BLACKLISTED"]).default("MEMBER"),
+  category: z.string().optional(),
+  groupUrl: z.string().optional(),
+  canPost: z.boolean().default(true),
+  notes: z.string().optional(),
+});
+
+const BulkAddGroupsBody = z.object({
+  groups: z.array(AddGroupBody).min(1).max(200),
+});
 
 // A pasted list is split client-side into lines; 500 is far more than anyone
 // types, and bounds a single request.
@@ -416,8 +459,12 @@ export async function POST(req: Request, ctx: Ctx) {
         media_type: b.mediaType,
         media_url: b.mediaUrl || null,
         link_url: b.linkUrl || null,
-        page_id: b.pageId,
-        page_name: b.pageName,
+        target_type: b.targetType || "group",
+        group_id: b.groupId || null,
+        group_name: b.groupName || null,
+        target_group_ids: b.targetGroupIds || [],
+        page_id: b.pageId || null,
+        page_name: b.pageName || null,
         scheduled_at: b.action === "schedule" ? b.scheduledAt! : null,
         status: b.action === "schedule" ? "scheduled" : "draft",
       });
@@ -426,6 +473,40 @@ export async function POST(req: Request, ctx: Ctx) {
         return json({ post: await publishPostNow(post.id) });
       }
       return json({ post });
+    }
+
+    if (route === "facebook/groups/sync") {
+      try {
+        const result = await syncUserGroups();
+        return json(result);
+      } catch (err) {
+        return json({ error: err instanceof Error ? err.message : "Falha ao sincronizar grupos." }, 502);
+      }
+    }
+
+    if (route === "facebook/groups") {
+      const body = await req.json().catch(() => null);
+      if (body?.groups && Array.isArray(body.groups)) {
+        const parsed = BulkAddGroupsBody.safeParse(body);
+        if (!parsed.success) return json({ error: "Formato de grupos inválido." }, 400);
+        const count = await bulkUpsertGroups(parsed.data.groups);
+        return json({ ok: true, count });
+      }
+      const parsed = AddGroupBody.safeParse(body);
+      if (!parsed.success) return json({ error: "Dados do grupo inválidos." }, 400);
+      const group = await upsertGroup(parsed.data);
+      return json({ ok: true, group });
+    }
+
+    if (route === "facebook/default-group") {
+      const parsed = DefaultGroupBody.safeParse(await req.json().catch(() => null));
+      if (!parsed.success) return json({ error: "groupId e groupName são obrigatórios." }, 400);
+      await updateSettings({
+        default_group_id: parsed.data.groupId,
+        default_group_name: parsed.data.groupName,
+        default_target_type: "group",
+      });
+      return json({ ok: true, groupName: parsed.data.groupName });
     }
 
     if (route === "topics") {
@@ -682,6 +763,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return json({ post: updated });
     }
 
+    // groups/<id>
+    if (path.length === 2 && path[0] === "groups") {
+      const updates = await req.json().catch(() => null);
+      if (!updates || typeof updates !== "object") return json({ error: "Invalid payload." }, 400);
+      const updated = await updateGroupStatus(path[1], updates);
+      return json({ group: updated });
+    }
+
     return notFound();
   });
 }
@@ -699,6 +788,11 @@ export async function DELETE(req: Request, ctx: Ctx) {
 
     if (path.length === 2 && path[0] === "posts") {
       await deletePostRecord(path[1]);
+      return json({ ok: true });
+    }
+
+    if (path.length === 2 && path[0] === "groups") {
+      await deleteGroup(path[1]);
       return json({ ok: true });
     }
 

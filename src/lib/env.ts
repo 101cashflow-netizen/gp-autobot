@@ -94,8 +94,8 @@ export const env = {
     const explicit = optional("NEXT_PUBLIC_SITE_URL");
     if (explicit) return explicit;
 
-    const vercelHost = optional("VERCEL_PROJECT_PRODUCTION_URL") || optional("VERCEL_URL");
-    if (vercelHost) return `https://${vercelHost}`;
+    const cfHost = optional("CF_PAGES_URL");
+    if (cfHost) return cfHost.startsWith("http") ? cfHost : `https://${cfHost}`;
 
     return "http://localhost:3000";
   },

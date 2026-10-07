@@ -17,6 +17,41 @@ export interface Topic {
   created_at: string;
 }
 
+export interface FacebookGroup {
+  id: string;
+  name: string;
+  description?: string | null;
+  privacy?: "PUBLIC" | "CLOSED" | "SECRET" | string;
+  status: "MEMBER" | "ADMIN" | "PENDING" | "DISCOVERED" | "BLACKLISTED";
+  member_count?: number;
+  group_url?: string | null;
+  icon_url?: string | null;
+  category?: string | null;
+  tags?: string[];
+  can_post: boolean;
+  requires_approval?: boolean;
+  is_secret?: boolean;
+  post_count?: number;
+  last_posted_at?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type TargetType = "group" | "page" | "multiple_groups";
+
+export interface PostGroupDelivery {
+  id: string;
+  post_id: string;
+  group_id: string;
+  group_name: string;
+  status: "pending" | "posted" | "failed" | "skipped";
+  facebook_post_id?: string | null;
+  error_message?: string | null;
+  posted_at?: string | null;
+  created_at: string;
+}
+
 export interface AppSettings {
   id: 1;
   /** Meta app credentials, normally entered in Settings rather than env vars. */
@@ -29,14 +64,25 @@ export interface AppSettings {
    * URL. Null means the app uses classic Facebook Login and scopes.
    */
   facebook_config_id: string | null;
-  /** Long-lived user token — lists Pages and mints Page tokens, never posts. */
+  /** Long-lived user token — lists Pages/Groups and mints Page tokens, never posts. */
   facebook_user_token: string | null;
   facebook_token_expires_at: string | null;
   facebook_user_name: string | null;
+  
+  // Default Targets
+  default_target_type?: TargetType;
+  default_group_id?: string | null;
+  default_group_name?: string | null;
   default_page_id: string | null;
   default_page_name: string | null;
   /** Page tokens derived from a long-lived user token do not expire. */
   default_page_token: string | null;
+
+  // Anti-Spam and Rate Limits for Groups
+  min_delay_between_posts_seconds?: number;
+  max_delay_between_posts_seconds?: number;
+  max_group_posts_per_day?: number;
+
   /** Gemini API key stored in database (optional fallback to env var). */
   gemini_api_key?: string | null;
   /** Groq API key stored in database (optional fallback to env var). */
@@ -82,13 +128,19 @@ export interface Post {
   title: string;
   description: string;
   hashtags: string[];
-  image_url: string;
-  image_source: ImageSource;
+  image_url: string | null;
+  image_source: ImageSource | null;
   media_type?: MediaType;
   media_url?: string | null;
   link_url: string | null;
+  
+  target_type?: TargetType;
+  group_id?: string | null;
+  group_name?: string | null;
+  target_group_ids?: string[];
   page_id: string | null;
   page_name: string | null;
+
   status: PostStatus;
   scheduled_at: string | null;
   posted_at: string | null;

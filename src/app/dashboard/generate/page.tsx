@@ -25,12 +25,14 @@ import type {
   CopyLanguage,
   CopyLength,
   CopyTone,
+  FacebookGroup,
   GeneratedContent,
   ImageSource,
   ImageSourcePref,
   MediaType,
   PageCache,
   StockProvider,
+  TargetType,
   TextAiProviderPref,
 } from "@/lib/types";
 
@@ -67,8 +69,12 @@ export default function GeneratePage() {
   const [hashtagInput, setHashtagInput] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
 
+  const [targetType, setTargetType] = useState<TargetType>("group");
+  const [groups, setGroups] = useState<FacebookGroup[]>([]);
+  const [groupId, setGroupId] = useState("");
   const [pages, setPages] = useState<PageCache[]>([]);
   const [pageId, setPageId] = useState("");
+
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [saving, setSaving] = useState<"draft" | "schedule" | "post_now" | null>(null);
@@ -76,9 +82,6 @@ export default function GeneratePage() {
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // Arriving from the Topics screen's "write now" link. Read directly rather
-    // than through useSearchParams, which would force a Suspense boundary
-    // around the whole form for one optional value.
     const fromLink = new URLSearchParams(window.location.search).get("topic");
     if (fromLink) setTopic(fromLink);
 
@@ -112,6 +115,18 @@ export default function GeneratePage() {
         } else {
           setAvatarName(null);
         }
+        if (d.default_target_type) {
+          setTargetType(d.default_target_type);
+        }
+      })
+      .catch(() => {});
+
+    fetch("/api/facebook/groups")
+      .then((r) => r.json())
+      .then((d) => {
+        setGroups(d.groups ?? []);
+        if (d.defaultGroupId) setGroupId(d.defaultGroupId);
+        else if (d.groups?.length > 0) setGroupId(d.groups[0].id);
       })
       .catch(() => {});
 
@@ -125,6 +140,7 @@ export default function GeneratePage() {
   }, []);
 
   const selectedPage = useMemo(() => pages.find((p) => p.page_id === pageId), [pages, pageId]);
+  const selectedGroup = useMemo(() => groups.find((g) => g.id === groupId), [groups, groupId]);
 
   async function generate() {
     if (topic.trim().length < 2) {
@@ -305,12 +321,20 @@ export default function GeneratePage() {
 
   async function save(action: "draft" | "schedule" | "post_now") {
     if (!content || (mediaType !== "text" && !image && !video)) return;
-    if (action !== "draft" && !pageId) {
-      setError("Choose a Page before scheduling or posting.");
-      return;
+    
+    if (action !== "draft") {
+      if (targetType === "group" && !groupId) {
+        setError("Escolha um Grupo do Facebook antes de agendar ou publicar.");
+        return;
+      }
+      if (targetType === "page" && !pageId) {
+        setError("Escolha uma Página do Facebook antes de agendar ou publicar.");
+        return;
+      }
     }
+
     if (action === "schedule" && !scheduledAt) {
-      setError("Pick a date and time to schedule this post.");
+      setError("Escolha uma data e hora para agendar esta publicação.");
       return;
     }
 
@@ -340,14 +364,17 @@ export default function GeneratePage() {
           mediaType: isText ? "text" : isVideo ? "video" : "image",
           mediaUrl: isVideo ? video!.url : undefined,
           linkUrl: linkUrl || undefined,
-          pageId: pageId || selectedPage?.page_id || "unset",
-          pageName: selectedPage?.name ?? "Unset",
+          targetType,
+          groupId: targetType === "group" ? groupId : undefined,
+          groupName: targetType === "group" ? (selectedGroup?.name ?? "Grupo Facebook") : undefined,
+          pageId: targetType === "page" ? (pageId || selectedPage?.page_id || "unset") : undefined,
+          pageName: targetType === "page" ? (selectedPage?.name ?? "Página Facebook") : undefined,
           action,
           scheduledAt: action === "schedule" ? new Date(scheduledAt).toISOString() : undefined,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to save post.");
+      if (!res.ok) throw new Error(data.error ?? "Falha ao salvar post.");
 
       if (action === "post_now" && data.post.status === "failed") {
         throw new Error(data.post.error_message ?? "Facebook rejected this post.");
@@ -863,24 +890,81 @@ export default function GeneratePage() {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Page</label>
-                <select
-                  value={pageId}
-                  onChange={(e) => setPageId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm outline-none focus:border-primary"
-                >
-                  <option value="">Select a Page…</option>
-                  {pages.map((p) => (
-                    <option key={p.page_id} value={p.page_id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                {pages.length === 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    No Pages found. Connect Facebook from Settings first.
-                  </p>
+              {/* Destino da Publicação: Grupos ou Páginas */}
+              <div className="space-y-2 rounded-xl border border-border bg-surface-2/40 p-3">
+                <label className="text-xs font-semibold text-muted-foreground">Destino da Publicação</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTargetType("group")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-semibold transition cursor-pointer",
+                      targetType === "group"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    👥 Grupo do Facebook
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTargetType("page")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-semibold transition cursor-pointer",
+                      targetType === "page"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    🚩 Página
+                  </button>
+                </div>
+
+                {targetType === "group" ? (
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground">Selecione o Grupo</label>
+                    <select
+                      value={groupId}
+                      onChange={(e) => setGroupId(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                    >
+                      <option value="">Selecione um Grupo...</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name} {g.is_secret ? "🕵️ (Secreto)" : g.privacy === "CLOSED" ? "🔒 (Privado)" : "🌐 (Público)"}
+                        </option>
+                      ))}
+                    </select>
+                    {groups.length === 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Nenhum grupo cadastrado.{" "}
+                        <Link href="/dashboard/groups" className="text-primary underline font-medium">
+                          Sincronizar grupos agora →
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground">Selecione a Página</label>
+                    <select
+                      value={pageId}
+                      onChange={(e) => setPageId(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                    >
+                      <option value="">Selecione uma Página...</option>
+                      {pages.map((p) => (
+                        <option key={p.page_id} value={p.page_id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    {pages.length === 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Nenhuma página encontrada. Conecte o Facebook nas Configurações.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

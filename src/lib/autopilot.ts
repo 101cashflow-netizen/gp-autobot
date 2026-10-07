@@ -62,8 +62,15 @@ export async function maybeRunAutopilot(): Promise<AutopilotResult> {
 
   if (!settings.auto_post_enabled) return { ran: false, reason: "disabled" };
   if (!isFacebookConnected(settings)) return { ran: false, reason: "not_connected" };
-  if (!settings.default_page_id || !settings.default_page_token) {
-    return { ran: false, reason: "no_default_page" };
+  const isGroupTarget = settings.default_target_type === "group";
+  if (isGroupTarget) {
+    if (!settings.default_group_id) {
+      return { ran: false, reason: "no_default_page" };
+    }
+  } else {
+    if (!settings.default_page_id || !settings.default_page_token) {
+      return { ran: false, reason: "no_default_page" };
+    }
   }
 
   const { dateKey, hour } = localParts(new Date(), settings.timezone);
@@ -102,9 +109,14 @@ export async function maybeRunAutopilot(): Promise<AutopilotResult> {
     hashtags: content.hashtags,
     image_url: image.url,
     image_source: image.source,
+    media_type: "image",
+    media_url: null,
     link_url: null,
-    page_id: settings.default_page_id,
-    page_name: settings.default_page_name,
+    target_type: isGroupTarget ? "group" : "page",
+    group_id: isGroupTarget ? settings.default_group_id : null,
+    group_name: isGroupTarget ? settings.default_group_name : null,
+    page_id: !isGroupTarget ? settings.default_page_id : null,
+    page_name: !isGroupTarget ? settings.default_page_name : null,
     scheduled_at: null,
     status: "draft",
   });

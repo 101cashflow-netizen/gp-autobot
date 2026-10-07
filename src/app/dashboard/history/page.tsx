@@ -107,7 +107,9 @@ export default function HistoryPage() {
                         </div>
                       </td>
                       <td className="hidden py-3 pr-3 text-muted-foreground sm:table-cell">
-                        {post.page_name ?? "—"}
+                        {post.target_type === "group" || post.group_name
+                          ? `👥 ${post.group_name ?? "Grupo"}`
+                          : `🚩 ${post.page_name ?? "Página"}`}
                       </td>
                       <td className="py-3 pr-3">
                         <StatusBadge status={post.status} />

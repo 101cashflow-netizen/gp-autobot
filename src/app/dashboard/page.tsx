@@ -16,8 +16,9 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { PostsChart } from "@/components/dashboard/posts-chart";
 import { listPosts } from "@/lib/db/posts";
 import { getSettings } from "@/lib/db/settings";
+import { listGroups } from "@/lib/db/groups";
 import { isFacebookConnected } from "@/lib/types";
-import type { Post } from "@/lib/types";
+import type { FacebookGroup, Post } from "@/lib/types";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ function buildChartData(posted: { posted_at: string | null }[]) {
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     counts.set(key, 0);
-    labels.push({ date: key, label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) });
+    labels.push({ date: key, label: d.toLocaleDateString("pt-BR", { month: "short", day: "numeric" }) });
   }
 
   for (const post of posted) {
@@ -45,15 +46,6 @@ function buildChartData(posted: { posted_at: string | null }[]) {
   return labels.map((l) => ({ ...l, count: counts.get(l.date) ?? 0 }));
 }
 
-/**
- * Shown when the dashboard cannot read its own database.
- *
- * This is the first screen of a fresh install, so it has to be useful: an
- * unhandled throw here becomes React error #441, whose message production
- * deliberately redacts, leaving a new user with "Something went wrong" and
- * nothing to act on. The cause is almost always one of three setup steps, so
- * they are named directly, along with the underlying error.
- */
 function SetupNeeded({ reason }: { reason: string }) {
   return (
     <div className="mx-auto max-w-2xl">
@@ -64,41 +56,32 @@ function SetupNeeded({ reason }: { reason: string }) {
           </div>
           <div className="min-w-0">
             <h2 className="font-heading font-bold text-foreground">
-              The database isn&apos;t set up yet
+              O banco de dados ainda não está configurado
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Everything else is deployed correctly — this screen just cannot read
-              from Supabase. It is almost always one of these:
+              A aplicação está rodando, mas não foi possível ler os dados do Supabase. Verifique os passos abaixo:
             </p>
 
             <ol className="mt-4 space-y-3 text-sm text-foreground">
               <li>
-                <span className="font-semibold">The schema was never run.</span>{" "}
+                <span className="font-semibold">O schema SQL foi executado?</span>{" "}
                 <span className="text-muted-foreground">
-                  In Supabase, open <strong>SQL Editor → New query</strong>, paste
-                  the whole of <code className="rounded bg-surface-2 px-1 text-xs">supabase/schema.sql</code>{" "}
-                  from the repository, and click Run. This is step 1 of the guide
-                  and the most common thing to miss.
+                  No Supabase, abra <strong>SQL Editor → New query</strong>, cole o conteúdo de{" "}
+                  <code className="rounded bg-surface-2 px-1 text-xs">supabase/schema.sql</code> e clique em <strong>Run</strong>.
                 </span>
               </li>
               <li>
-                <span className="font-semibold">An environment variable is wrong.</span>{" "}
+                <span className="font-semibold">As variáveis de ambiente estão corretas?</span>{" "}
                 <span className="text-muted-foreground">
-                  In Vercel, check{" "}
-                  <code className="rounded bg-surface-2 px-1 text-xs">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-                  and{" "}
-                  <code className="rounded bg-surface-2 px-1 text-xs">SUPABASE_SERVICE_ROLE_KEY</code>.
-                  The key must be the <strong>service_role</strong> one, not{" "}
-                  <code className="rounded bg-surface-2 px-1 text-xs">anon</code>. After
-                  changing either, redeploy — Vercel only applies variables to new
-                  deployments.
+                  No painel do Cloudflare Pages (Settings &gt; Environment Variables) ou no seu <code className="rounded bg-surface-2 px-1 text-xs">.env.local</code>,
+                  verifique se <code className="rounded bg-surface-2 px-1 text-xs">NEXT_PUBLIC_SUPABASE_URL</code> e{" "}
+                  <code className="rounded bg-surface-2 px-1 text-xs">SUPABASE_SERVICE_ROLE_KEY</code> foram preenchidas.
                 </span>
               </li>
               <li>
-                <span className="font-semibold">The Supabase project is paused.</span>{" "}
+                <span className="font-semibold">O projeto do Supabase está ativo?</span>{" "}
                 <span className="text-muted-foreground">
-                  Free projects pause after a stretch of inactivity. Open your
-                  Supabase dashboard and resume it; your data is still there.
+                  Projetos gratuitos do Supabase podem pausar após semanas de inatividade. Verifique no painel do Supabase.
                 </span>
               </li>
             </ol>
@@ -116,9 +99,14 @@ function SetupNeeded({ reason }: { reason: string }) {
 export default async function DashboardOverviewPage() {
   let posts: Post[];
   let settings: Awaited<ReturnType<typeof getSettings>>;
+  let groups: FacebookGroup[] = [];
 
   try {
-    [posts, settings] = await Promise.all([listPosts({ limit: 200 }), getSettings()]);
+    [posts, settings, groups] = await Promise.all([
+      listPosts({ limit: 200 }),
+      getSettings(),
+      listGroups().catch(() => []),
+    ]);
   } catch (err) {
     return <SetupNeeded reason={err instanceof Error ? err.message : String(err)} />;
   }
@@ -138,9 +126,9 @@ export default async function DashboardOverviewPage() {
       {!connected && (
         <Card className="flex flex-col items-start justify-between gap-3 border-primary/30 bg-primary/5 sm:flex-row sm:items-center">
           <div>
-            <p className="font-semibold text-foreground">Conecte sua Página do Facebook para publicar</p>
+            <p className="font-semibold text-foreground">Conecte sua conta do Facebook para publicar</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Você pode gerar textos e imagens, mas para postar é necessário conectar uma Página.
+              Você pode gerar textos e imagens, mas para postar em Grupos ou Páginas é necessário conectar sua conta.
             </p>
           </div>
           <Link href="/dashboard/settings">
@@ -155,7 +143,7 @@ export default async function DashboardOverviewPage() {
         <StatCard label="Total Publicados" value={posted.length} icon={MegaphoneSimple} tone="primary" />
         <StatCard label="Esta Semana" value={postedThisWeek.length} icon={CalendarCheck} tone="success" />
         <StatCard label="Fila / Agendados" value={scheduled.length} icon={ClockCountdown} tone="warning" />
-        <StatCard label="Falhas" value={failed.length} icon={ChartLineUp} />
+        <StatCard label="Grupos Cadastrados" value={groups.length} icon={ChartLineUp} tone="primary" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -169,7 +157,7 @@ export default async function DashboardOverviewPage() {
         <Card className="flex flex-col">
           <h2 className="font-heading text-base font-bold text-foreground">Criação Rápida</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Escolha um tema e deixe a IA redigir a copy e criar a imagem/vídeo.
+            Escolha um tema e deixe a IA redigir a copy e criar a imagem/vídeo para seus grupos e páginas.
           </p>
           <Link href="/dashboard/generate" className="mt-4">
             <Button className="w-full">
@@ -185,8 +173,14 @@ export default async function DashboardOverviewPage() {
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
+              <span className="text-muted-foreground">Grupo Ativo</span>
+              <span className="truncate font-medium text-foreground max-w-[150px]">
+                {settings.default_group_name ?? (groups.length > 0 ? `${groups.length} grupos disponíveis` : "Nenhum")}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
               <span className="text-muted-foreground">Página</span>
-              <span className="truncate font-medium text-foreground">
+              <span className="truncate font-medium text-foreground max-w-[150px]">
                 {settings.default_page_name ?? "—"}
               </span>
             </div>

@@ -8,6 +8,7 @@ import {
   Lightbulb,
   ClockCountdown,
   ListChecks,
+  Users,
   FlagBanner,
   GearSix,
 } from "@phosphor-icons/react/dist/ssr";
@@ -17,6 +18,7 @@ import { cn } from "@/lib/cn";
 const NAV = [
   { href: "/dashboard", label: "Visão Geral", icon: House },
   { href: "/dashboard/generate", label: "Criar Post", icon: MagicWand },
+  { href: "/dashboard/groups", label: "Grupos do Facebook", icon: Users },
   { href: "/dashboard/topics", label: "Banco de Temas", icon: Lightbulb },
   { href: "/dashboard/queue", label: "Fila & Agendados", icon: ClockCountdown },
   { href: "/dashboard/history", label: "Histórico", icon: ListChecks },
