@@ -268,8 +268,9 @@ export async function GET(req: Request, ctx: Ctx) {
         );
       }
 
+      const reauth = url.searchParams.get("reauth") === "1";
       const state = crypto.randomUUID();
-      const res = NextResponse.redirect(buildAuthorizeUrl(creds, state));
+      const res = NextResponse.redirect(buildAuthorizeUrl(creds, state, reauth));
       res.cookies.set(OAUTH_STATE_COOKIE, state, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

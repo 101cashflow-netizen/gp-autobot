@@ -24,13 +24,17 @@ export const FACEBOOK_SCOPES = [
  * Facebook Login still take scopes. Both are supported, chosen by whether a
  * configuration id has been provided.
  */
-export function buildAuthorizeUrl(creds: FacebookCredentials, state: string) {
+export function buildAuthorizeUrl(creds: FacebookCredentials, state: string, reauth = false) {
   const params = new URLSearchParams({
     client_id: creds.appId,
     redirect_uri: creds.redirectUri,
     response_type: "code",
     state,
   });
+
+  if (reauth) {
+    params.set("auth_type", "reauthenticate");
+  }
 
   if (creds.configId) {
     params.set("config_id", creds.configId);

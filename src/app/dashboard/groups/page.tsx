@@ -15,6 +15,7 @@ import {
   MagnifyingGlass,
   ArrowSquareOut,
   ShieldCheck,
+  UserSwitch,
 } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function GroupsPage() {
   const [defaultGroupId, setDefaultGroupId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -90,6 +92,18 @@ export default function GroupsPage() {
       setError(err instanceof Error ? err.message : "Erro na sincronização de grupos.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleSwitchAccount() {
+    if (!confirm("Deseja desconectar a conta atual do Facebook e conectar outro perfil?")) return;
+    setSwitching(true);
+    try {
+      await fetch("/api/facebook/disconnect", { method: "POST" });
+      window.location.href = "/api/facebook/oauth/start?reauth=1";
+    } catch (err) {
+      setError("Erro ao desconectar conta.");
+      setSwitching(false);
     }
   }
 
@@ -291,9 +305,14 @@ export default function GroupsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={handleSync} disabled={syncing}>
+          <Button size="sm" variant="secondary" onClick={handleSync} disabled={syncing || switching}>
             <ArrowClockwise size={15} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Sincronizando..." : "Sincronizar da Conta"}
+          </Button>
+
+          <Button size="sm" variant="secondary" onClick={handleSwitchAccount} disabled={switching}>
+            <UserSwitch size={15} />
+            {switching ? "Redirecionando..." : "Trocar Conta"}
           </Button>
 
           <Button size="sm" variant="secondary" onClick={() => setShowBulkModal(true)}>

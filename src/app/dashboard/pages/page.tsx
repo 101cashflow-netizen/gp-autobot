@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowClockwise, Star, FlagBanner } from "@phosphor-icons/react/dist/ssr";
+import { ArrowClockwise, Star, FlagBanner, UserSwitch, LinkBreak } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { PageCache } from "@/lib/types";
@@ -12,6 +12,7 @@ export default function PagesPage() {
   const [defaultId, setDefaultId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,11 +43,21 @@ export default function PagesPage() {
     load(false);
   }, [load]);
 
+  async function handleSwitchAccount() {
+    if (!confirm("Deseja desconectar a conta atual do Facebook e conectar outro perfil?")) return;
+    setSwitching(true);
+    try {
+      await fetch("/api/facebook/disconnect", { method: "POST" });
+      window.location.href = "/api/facebook/oauth/start?reauth=1";
+    } catch (err) {
+      setError("Erro ao desconectar conta.");
+      setSwitching(false);
+    }
+  }
+
   async function setDefault(page: PageCache) {
     setDefaultId(page.page_id);
     setError(null);
-    // Only the id is sent: the server re-fetches the Page token itself so a
-    // publishing credential never travels through the browser.
     const res = await fetch("/api/facebook/default-page", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,27 +72,38 @@ export default function PagesPage() {
   if (notConnected) {
     return (
       <Card className="py-10 text-center">
-        <p className="font-medium text-foreground">Facebook isn&apos;t connected yet</p>
+        <p className="font-medium text-foreground">Facebook não está conectado</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect your account to see the Pages you can post to.
+          Conecte sua conta do Facebook para gerenciar suas Páginas.
         </p>
-        <Link href="/dashboard/settings" className="mt-4 inline-block">
-          <Button size="sm">Go to Settings</Button>
-        </Link>
+        <a href="/api/facebook/oauth/start?reauth=1" className="mt-4 inline-block">
+          <Button size="sm">Conectar Facebook</Button>
+        </a>
       </Card>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Pick the Page new posts publish to. Only Pages you can create content on are listed.
-        </p>
-        <Button size="sm" variant="secondary" onClick={() => load(true)} disabled={refreshing}>
-          <ArrowClockwise size={14} className={refreshing ? "animate-spin" : ""} />
-          {refreshing ? "Refreshing…" : "Refresh from Facebook"}
-        </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Páginas do Facebook</h1>
+          <p className="text-sm text-muted-foreground">
+            Selecione a Página padrão para publicações automáticas.
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => load(true)} disabled={refreshing || switching}>
+            <ArrowClockwise size={14} className={refreshing ? "animate-spin" : ""} />
+            {refreshing ? "Atualizando…" : "Atualizar Páginas"}
+          </Button>
+
+          <Button size="sm" variant="secondary" onClick={handleSwitchAccount} disabled={switching}>
+            <UserSwitch size={15} />
+            {switching ? "Redirecionando..." : "Conectar Outro Perfil / Trocar Conta"}
+          </Button>
+        </div>
       </div>
 
       {error && (
